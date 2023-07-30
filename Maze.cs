@@ -22,9 +22,9 @@ namespace P2
         //49 items!
 
         Dictionary<(byte, byte), Tile> tileSet = new Dictionary<(byte, byte), Tile>(); //dict of all tiles. maps coords to tile objects
-        (byte,byte)[] path = new (byte,byte)[19];//list of path spaces.
-        public (byte, byte) start, end;
-        private int maxY, maxX;     //equals NUMBER of items per axis; 1 more than max "index"
+        (byte,byte)[] path = new (byte,byte)[19];   //list of path spaces.
+        public (byte, byte) start, end;             //x and y for start and end - not relevant in P2 ;P
+        private int maxY, maxX;                     //equals NUMBER of items per axis; 1 more than max "index"
         public Maze(int mY, int mX) 
         {
             maxY = mY;
@@ -38,7 +38,7 @@ namespace P2
             }
         }
 
-        public void makePath((byte,byte)[] pathSpaces)
+        public void MakePath((byte,byte)[] pathSpaces)
         {
             this.path = pathSpaces;
             foreach((byte, byte) t in pathSpaces)
@@ -60,6 +60,11 @@ namespace P2
             return tileSet[path[0]];
         }
 
+        public (byte,byte)[] GetPathFull()
+        {
+            return path;
+        }
+
         public Tile GetTile((byte,byte) tileCoords)
         {
             try
@@ -72,7 +77,7 @@ namespace P2
             }
         }
 
-        public bool isLegalMove(Tile a, Tile b)
+        public bool IsLegalMove(Tile a, Tile b)
         {
             //a is current, b is target
             //Check: if obstacle, if OOB, *then* if valid.
@@ -99,7 +104,7 @@ namespace P2
             return false;
         }
 
-        public void printMaze()
+        public void PrintMaze()
         {
             for (byte i = 0; i < maxY; i++)
             {

@@ -23,8 +23,10 @@ namespace P2
                 (5,6)
             };
             Maze myMaze = new Maze(7, 7);
-            myMaze.makePath(pathList);
-            myMaze.printMaze();
+            myMaze.MakePath(pathList);
+            myMaze.PrintMaze();
+
+            Robot mazeRunner = new Robot(myMaze);
         }
         /*
          *  ## [] ## ## ## ## ##
