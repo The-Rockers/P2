@@ -18,6 +18,7 @@ namespace P2
         readonly double[] DIR_PROB = new double[3] { RGT, LFT, FWD }; //R,L,F
         enum direction { west, north, east, south }; //0 = west 1 = north 2 = east 3 = south
         Maze internalMaze;
+        bool[] measurements = new bool[4];
 
         (byte, byte)[] allTiles;
         Dictionary<(byte, byte), bool[]> theBigOne = new Dictionary<(byte, byte), bool[]>();    //mapping of all coords to a 4-bit state array (walls)
@@ -27,10 +28,11 @@ namespace P2
         {
             this.internalMaze = x;  //please fully define maze before setting up robot. thank you.
             allTiles = internalMaze.GetPathFull();
-            foreach((byte,byte)coord in allTiles)
+            Tile tempTile;
+            foreach ((byte,byte)coord in allTiles)
             {
                 theBigOne.Add(coord, new bool[4] { false, false, false, false });
-                Tile tempTile = new Tile(coord.Item1, coord.Item2);
+                tempTile = new Tile(coord.Item1, coord.Item2);
                 for (int i = 0; i < 4; i++)
                 {
                     theBigOne[coord][i] = !internalMaze.IsLegalMove(tempTile, internalMaze.GetTile(tileCoords: GetNeighbor(tempTile,(direction)(i)).GetCoords()));
@@ -38,14 +40,50 @@ namespace P2
             }
         }
 
-        private void Sense()
+        private bool[] Sense(Tile tgtTile)
         {
             //90% chance to correctly detect obstacle - 10% to erroneously ignore
             //5% chance to erroneously detect obstacle - 95% to correctly ignore
-            //
+            Random q = new Random();
+            double roll;
+            bool[] temp = new bool[4];
+            Tile nextTile;
+            bool actual;
 
+            for(int i = 0; i < 4; i++)
+            {
+                nextTile = GetNeighbor(tgtTile, (direction)i);
+                actual = internalMaze.IsLegalMove(tgtTile, nextTile);
+                roll = q.NextDouble();
+                if (!actual) //the move in question is illegal; there is a wall
+                {
+                    if(roll <= HIT_GIVEN_EXIST) { actual = true; }
+                    else { actual = false; }
+                }
+                else        //legal move; no wall
+                {
+                    if(roll <= MIS_GIVEN_EMPTY) { actual = false; }
+                    else { actual = true;  }
+                }
+                temp[i] = actual;
+            }
+            return temp;
+        }
+
+        private void Filter()
+        {
+            double guess = 0.0;
+            foreach (var x in theBigOne)
+            {
+                for (int i = 0; i < 4; i++)
+                {
+                    //product of all probs
+                }
+                //assign myGuess @ this index
+            }
 
         }
+
         //Prob. function based on algorithm by Tâm Carbon https://tamcarbonart.wordpress.com/2018/10/09/c-pick-random-elements-based-on-probability/
         private void GetMove(Tile tgtTile)
         {
@@ -118,7 +156,6 @@ namespace P2
                     break;
             }
             return current; //return self if no neighbor in given direction- automatic bounce! (move into wall -> not legal -> ends up on self)
-
         }
 
 
