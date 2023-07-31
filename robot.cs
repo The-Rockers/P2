@@ -40,13 +40,13 @@ namespace P2
             }
         }
 
-        private bool[] Sense(Tile tgtTile)
+        private bool[] Sense(Tile tgtTile)  //returns flawed measurements
         {
             //90% chance to correctly detect obstacle - 10% to erroneously ignore
             //5% chance to erroneously detect obstacle - 95% to correctly ignore
             Random q = new Random();
             double roll;
-            bool[] temp = new bool[4];
+            bool[] measurement = new bool[4];
             Tile nextTile;
             bool actual;
 
@@ -58,42 +58,55 @@ namespace P2
                 if (!actual) //the move in question is illegal; there is a wall
                 {
                     if(roll <= HIT_GIVEN_EXIST) { actual = true; }
-                    else { actual = false; }
-                }
+                    else { actual = false; }    //wait. this is redundant. uh.
+                }                                                   
                 else        //legal move; no wall
                 {
                     if(roll <= MIS_GIVEN_EMPTY) { actual = false; }
                     else { actual = true;  }
                 }
-                temp[i] = actual;
+                //this loop flips "actual" from meaning "this is a legal move" to "there is no wall here"
+                //so I can just assign to "actual" at end of iteration
+                measurement[i] = actual;
             }
-            return temp;
+            return measurement;
         }
 
-        private void Filter()
+        private void Filter()   //gee i sure hope this is what filtering is!!
         {
+            bool[] z = new bool[4];
             double guess = 0.0;
             foreach (var x in theBigOne)
             {
                 for (int i = 0; i < 4; i++)
                 {
-                    //product of all probs
+                    if (x.Value[i])     //wall
+                    {
+                        if (z[i]) { guess *= HIT_GIVEN_EXIST; } //true given true
+                        else { guess *= MIS_GIVEN_EXIST; } //false given true
+                    }
+                    else                //no wall
+                    {
+                        if (z[i]) { guess *= HIT_GIVEN_EMPTY; } //true given false
+                        else { guess *= MIS_GIVEN_EXIST; } //false given false
+                    }
+                    //should probably. change this such that it checks most common cases (true|true, false|false) first
                 }
-                //assign myGuess @ this index
+                myGuess[(x.Key.Item1, x.Key.Item2)] = guess;
+                //now remember to change the tile's face to this value. also round it to 4(?) digits
             }
-
         }
 
         //Prob. function based on algorithm by Tâm Carbon https://tamcarbonart.wordpress.com/2018/10/09/c-pick-random-elements-based-on-probability/
         private void GetMove(Tile tgtTile)
         {
-            //determine target direction somehow (dont pass it, i already pass so much LOL)
+            //determine target direction (somehow)
             //get 3 direction values based on this - one to 'right' and one to 'left' (+ original)  R,L,F
-            //populate array of neighbors based on 3 directions
-            //direction directions[] = new directions[3] {directions.west, directions.north, directions.east}
-            //for(int i = 0; i < 3; i++) { neigborTiles[i] = GetNeighbor(curentTile, directions[i]) }
+            //populate array of neighbors based on 3 directions, eg:
+            //  direction directions[] = new directions[3] {directions.west, directions.north, directions.east }
+            //  for(int i = 0; i < 3; i++) { neigborTiles[i] = GetNeighbor(curentTile, directions[i]) }
             Random q = new Random();
-            direction toss = (direction)(q.Next(0, 3)); //picking random direction to move for now???????
+            direction toss = (direction)(q.Next(0, 3)); //picking random direction to move for now??? (TikTok TTS lady voice)
             double roll = q.NextDouble();
             double cumulativeProb = 0.0;
             int tgtIndex = 0;
@@ -101,7 +114,7 @@ namespace P2
             Tile[] neighborTiles = new Tile[3];
 
             switch (toss)       //MOST neighbor math can be determined by index +/- 1, but not west and south (ends of the list/no wraparound)
-            {                   //unless .net does automatic wrap around stuff. LOL. not worried about ~10 lines of code
+            {                   //unless .Net does automatic wrap around stuff. LOL. not worried about ~10 lines of code
                 case direction.west:
                     directions = new direction[3] { direction.north, direction.south, toss};
                     break;
@@ -116,7 +129,6 @@ namespace P2
             for (int i = 0; i < 3; i++)                                     //NEED TO CHANGE THIS!
             { neighborTiles[i] = GetNeighbor(tgtTile, directions[i]); }     //unless I use tgtTile as the current tile. lol.
 
-
             for (int i = 0; i < 3; i++)
             {
                 cumulativeProb += DIR_PROB[i];
@@ -126,7 +138,6 @@ namespace P2
                     break; //hit! The random value is beneath the threshold established for the direction (but above the previous threshold)
                 }
             }
-
             //moveTo(neighborTiles[tgtIndex]);
         }
 
