@@ -27,6 +27,19 @@ namespace P2
             myMaze.PrintMaze();
 
             Robot mazeRunner = new Robot(myMaze);
+
+            byte userX, userY;
+            Console.WriteLine("Enter coordinates to test");
+            userX = Convert.ToByte(Console.ReadLine());
+            userY = Convert.ToByte(Console.ReadLine());
+            
+            while(userX != 99)
+            {
+                mazeRunner.PrintTruth(userX, userY);
+                Console.WriteLine("Enter coordinates to test");
+                userX = Convert.ToByte(Console.ReadLine());
+                userY = Convert.ToByte(Console.ReadLine());
+            }
         }
         /*
          *  ## [] ## ## ## ## ##

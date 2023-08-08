@@ -31,14 +31,29 @@ namespace P2
             Tile tempTile;
             foreach ((byte,byte)coord in allTiles)
             {
-                theBigOne.Add(coord, new bool[4] { false, false, false, false });
+                this.theBigOne.Add(coord, new bool[4] { false, false, false, false });
                 tempTile = new Tile(coord.Item1, coord.Item2);
-                for (int i = 0; i < 4; i++)
-                {
-                    theBigOne[coord][i] = !internalMaze.IsLegalMove(tempTile, internalMaze.GetTile(tileCoords: GetNeighbor(tempTile,(direction)(i)).GetCoords()));
-                }
+                Tile cursorTile;
+
+                cursorTile = internalMaze.GetTile(((byte,byte))(tempTile.x-1, tempTile.y));
+                this.theBigOne[coord][0] = !internalMaze.IsLegalMove(tempTile, cursorTile);
+
+                cursorTile = internalMaze.GetTile(((byte, byte))(tempTile.x, tempTile.y-1));
+                this.theBigOne[coord][1] = !internalMaze.IsLegalMove(tempTile, cursorTile);
+
+                cursorTile = internalMaze.GetTile(((byte,byte))(tempTile.x+1, tempTile.y));
+                this.theBigOne[coord][2] = !internalMaze.IsLegalMove(tempTile, cursorTile);
+
+                cursorTile = internalMaze.GetTile(((byte, byte))(tempTile.x, tempTile.y+1));
+                this.theBigOne[coord][3] = !internalMaze.IsLegalMove(tempTile, cursorTile);
+
+                //doing this manually sucks but the other way had a zillion casts that sucked lol.
             }
         }
+
+        public void PrintTruth(byte x, byte y) //debug only. crashes if you ask for something not on the path, haha
+        { foreach (bool p in theBigOne[(x, y)]) { Console.WriteLine(p); } }
+
 
         private bool[] Sense(Tile tgtTile)  //returns flawed measurements
         {
@@ -72,8 +87,9 @@ namespace P2
             return measurement;
         }
 
-        private void Filter()   //gee i sure hope this is what filtering is!!
-        {
+        private void Filter()   //gee i sure hope this is what filtering is!! edit wow i was close!
+        {                       //Filter: foreach item in list of open tiles, multiply together all (Z|S), then take that and multiply it by the previously existing estimate.
+                                //divide THAT number by the sum of ALL of those numbers for a given tile's posterior estimate.
             bool[] z = new bool[4];
             double guess = 0.0;
             foreach (var x in theBigOne)
