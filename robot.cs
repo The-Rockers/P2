@@ -20,20 +20,23 @@ namespace P2
         Maze internalMaze;
         bool[] measurements = new bool[4];
 
-        (byte, byte)[] allTiles;
+        (byte, byte)[] allPathTiles;
         Dictionary<(byte, byte), bool[]> theBigOne = new Dictionary<(byte, byte), bool[]>();    //mapping of all coords to a 4-bit state array (walls)
         Dictionary<(byte, byte), double> myGuess = new Dictionary<(byte, byte), double>();      //similar but now for estimates.
 
         public Robot(Maze x)
         {
             this.internalMaze = x;  //please fully define maze before setting up robot. thank you.
-            allTiles = internalMaze.GetPathFull();
+            allPathTiles = internalMaze.GetPathFull();
             Tile tempTile;
-            foreach ((byte,byte)coord in allTiles)
+            double intl = 1.0 / allPathTiles.Count();
+            foreach ((byte,byte)coord in allPathTiles)
             {
                 this.theBigOne.Add(coord, new bool[4] { false, false, false, false });
+                this.myGuess.Add(coord, intl);
                 tempTile = new Tile(coord.Item1, coord.Item2);
                 Tile cursorTile;
+                internalMaze.GetTile((coord)).SetFace(Convert.ToString(Math.Round(intl*100,2)));
 
                 cursorTile = internalMaze.GetTile(((byte,byte))(tempTile.x-1, tempTile.y));
                 this.theBigOne[coord][0] = !internalMaze.IsLegalMove(tempTile, cursorTile);
@@ -49,10 +52,11 @@ namespace P2
 
                 //doing this manually sucks but the other way had a zillion casts that sucked lol.
             }
+            
         }
 
         public void PrintTruth(byte x, byte y) //debug only. crashes if you ask for something not on the path, haha
-        { foreach (bool p in theBigOne[(x, y)]) { Console.WriteLine(p); } }
+        { Console.WriteLine(printEvidence(theBigOne[(x,y)])); }
 
 
         private bool[] Sense(Tile tgtTile)  //returns flawed measurements
@@ -62,15 +66,18 @@ namespace P2
             Random q = new Random();
             double roll;
             bool[] measurement = new bool[4];
-            Tile nextTile;
+            //Tile nextTile;
             bool actual;
 
             for(int i = 0; i < 4; i++)
             {
-                nextTile = GetNeighbor(tgtTile, (direction)i);
-                actual = internalMaze.IsLegalMove(tgtTile, nextTile);
-                roll = q.NextDouble();
-                if (!actual) //the move in question is illegal; there is a wall
+                //nextTile = GetNeighbor(tgtTile, (direction)i);
+                //actual = internalMaze.IsLegalMove(tgtTile, nextTile);       //actual: is the ground truth. why did i do this...?
+                
+
+                roll = q.NextDouble(); //so long as the value is UNDER the threshold of RIGHT|TRUTH
+
+                if (this.theBigOne[tgtTile.GetCoords()][i]) //there is a wall
                 {
                     if(roll <= HIT_GIVEN_EXIST) { actual = true; }
                     else { actual = false; }    //wait. this is redundant. uh.
@@ -84,34 +91,75 @@ namespace P2
                 //so I can just assign to "actual" at end of iteration
                 measurement[i] = actual;
             }
+            Console.WriteLine(String.Format("The Tile I'm at: {0},{1}",tgtTile.x, tgtTile.y));
+            Console.WriteLine(String.Format("What I THINK I see...{0}", printEvidence(measurement)));
+            Console.WriteLine(String.Format("What's REALLY there... {0}", printEvidence(this.theBigOne[tgtTile.GetCoords()])));
             return measurement;
         }
 
-        private void Filter()   //gee i sure hope this is what filtering is!! edit wow i was close!
+        public string printEvidence(bool[] targ)
+        {
+            string targAsStr = "[";
+            foreach(bool x in targ)
+            {
+                if (x) { targAsStr += "1"; }
+                else { targAsStr += "0"; }
+            }
+            targAsStr += "]";
+            return(targAsStr);
+
+        }
+
+        public void Filter(Tile currentTile)   //gee i sure hope this is what filtering is!! edit wow i was close!
         {                       //Filter: foreach item in list of open tiles, multiply together all (Z|S), then take that and multiply it by the previously existing estimate.
                                 //divide THAT number by the sum of ALL of those numbers for a given tile's posterior estimate.
-            bool[] z = new bool[4];
+            bool[] z = Sense(currentTile);
+            double[] guesstimate = new double[4];
             double guess = 0.0;
-            foreach (var x in theBigOne)
+            double runningSum = 0.0;
+            foreach (var x in theBigOne)            //FIXME: wait idk. lol.
             {
                 for (int i = 0; i < 4; i++)
                 {
+
                     if (x.Value[i])     //wall
                     {
-                        if (z[i]) { guess *= HIT_GIVEN_EXIST; } //true given true
-                        else { guess *= MIS_GIVEN_EXIST; } //false given true
+                        if (z[i]) { guesstimate[i] = HIT_GIVEN_EXIST; } //true given true
+                        else { guesstimate [i] = MIS_GIVEN_EXIST; } //false given true
                     }
                     else                //no wall
                     {
-                        if (z[i]) { guess *= HIT_GIVEN_EMPTY; } //true given false
-                        else { guess *= MIS_GIVEN_EXIST; } //false given false
+                        if (z[i]) { guesstimate[i] = HIT_GIVEN_EMPTY; } //true given false
+                        else { guesstimate[i] = MIS_GIVEN_EXIST; } //false given false
                     }
-                    //should probably. change this such that it checks most common cases (true|true, false|false) first
+                    //should probably. change this such that it checks most common cases (true|true, false|false) first.
                 }
-                myGuess[(x.Key.Item1, x.Key.Item2)] = guess;
+                for(int j = 1; j < 4; j++) { guesstimate[0] *= guesstimate[j]; }
+                guess = guesstimate[0];
+                guess *= myGuess[(x.Key.Item1, x.Key.Item2)];
+                myGuess[(x.Key.Item1, x.Key.Item2)] = guess;    //ok i did that . now we have to sum that with all tiles ever yay and divide.
+                runningSum += guess;
                 //now remember to change the tile's face to this value. also round it to 4(?) digits
             }
+            foreach(var y in theBigOne)
+            {
+                myGuess[(y.Key.Item1, y.Key.Item2)] /= runningSum;
+            }
+            updateMaze();
         }
+        
+        private void updateMaze()
+        {
+            Tile y;
+            double g;
+            foreach(var x in myGuess)
+            {
+                y = internalMaze.GetTile(x.Key);
+                g = Math.Round(x.Value * 100, 2);
+                y.SetFace(Convert.ToString(g));
+            }
+        }
+
 
         //Prob. function based on algorithm by Tâm Carbon https://tamcarbonart.wordpress.com/2018/10/09/c-pick-random-elements-based-on-probability/
         private void GetMove(Tile tgtTile)
@@ -157,7 +205,7 @@ namespace P2
             //moveTo(neighborTiles[tgtIndex]);
         }
 
-        private Tile GetNeighbor(Tile current, direction x)
+        private Tile GetNeighbor(Tile current, direction x) //sets neighbor in context of possible movement ONLY!!!!
         {
             Tile testTgt;
 

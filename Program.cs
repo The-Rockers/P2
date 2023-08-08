@@ -24,9 +24,21 @@ namespace P2
             };
             Maze myMaze = new Maze(7, 7);
             myMaze.MakePath(pathList);
+            Tile demo = myMaze.GetTile((1, 1));
+
             myMaze.PrintMaze();
 
             Robot mazeRunner = new Robot(myMaze);
+            
+            Console.WriteLine(Environment.NewLine);
+            
+
+            myMaze.PrintMaze();
+            Console.WriteLine(Environment.NewLine);
+            mazeRunner.Filter(demo);
+
+            myMaze.PrintMaze();
+            Console.WriteLine(Environment.NewLine);
 
             byte userX, userY;
             Console.WriteLine("Enter coordinates to test");
@@ -40,6 +52,7 @@ namespace P2
                 userX = Convert.ToByte(Console.ReadLine());
                 userY = Convert.ToByte(Console.ReadLine());
             }
+
         }
         /*
          *  ## [] ## ## ## ## ##
