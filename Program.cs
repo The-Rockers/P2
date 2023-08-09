@@ -27,33 +27,28 @@ namespace P2
             Tile demo = myMaze.GetTile((3,4));      //START TILE BASED ON PROJECT PDF IS 3,4 !!!!
 
             myMaze.PrintMaze();
-
             Robot mazeRunner = new Robot(myMaze);
-            
             Console.WriteLine(Environment.NewLine);
-            
-
             myMaze.PrintMaze();
-            Console.WriteLine(Environment.NewLine);
-            mazeRunner.Filter(demo);
 
-            myMaze.PrintMaze();
-            Console.WriteLine(Environment.NewLine);
-            /*
-            byte userX, userY;
-            Console.WriteLine("Enter coordinates to test");
-            userX = Convert.ToByte(Console.ReadLine());
-            userY = Convert.ToByte(Console.ReadLine());
-            
-            while(userX != 99)
-            {
-                mazeRunner.PrintTruth(userX, userY);
-                Console.WriteLine("Enter coordinates to test");
-                userX = Convert.ToByte(Console.ReadLine());
-                userY = Convert.ToByte(Console.ReadLine());
-                Console.Clear();
-            }*/
+            mazeRunner.setDropPoint(demo.GetCoords());
+            mazeRunner.Filter();
 
+            mazeRunner.Move('N');
+
+            mazeRunner.Filter();
+
+            mazeRunner.Move('E');
+
+            mazeRunner.Filter();
+
+            mazeRunner.Move('E');
+
+            mazeRunner.Filter();
+
+            mazeRunner.Move('N');
+
+            mazeRunner.Filter();
         }
         /*
          *  ## [] ## ## ## ## ##

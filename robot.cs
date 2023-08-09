@@ -20,6 +20,7 @@ namespace P2
         enum direction { west, north, east, south }; //0 = west 1 = north 2 = east 3 = south
         Maze internalMaze;
         bool[] measurements = new bool[4];
+        Tile activeTile;
 
         (byte, byte)[] allPathTiles;
         Dictionary<(byte, byte), bool[]> theBigOne = new Dictionary<(byte, byte), bool[]>();    //mapping of all coords to a 4-bit state array (walls)
@@ -59,6 +60,10 @@ namespace P2
         public void PrintTruth(byte x, byte y) //debug only. crashes if you ask for something not on the path, haha
         { Console.WriteLine(printEvidence(theBigOne[(x,y)])); }
 
+        public void setDropPoint((byte, byte) x)
+        {
+            this.activeTile = internalMaze.GetTile(x);
+        }
 
         private bool[] Sense(Tile tgtTile)  //returns flawed measurements
         {
@@ -109,20 +114,20 @@ namespace P2
 
         }
 
-        public void Filter(Tile currentTile)   //gee i sure hope this is what filtering is!! edit wow i was close!
+        public void Filter()   //gee i sure hope this is what filtering is!! edit wow i was close!
         {                       //Filter: foreach item in list of open tiles, multiply together all (Z|S), then take that and multiply it by the previously existing estimate.
                                 //divide THAT number by the sum of ALL of those numbers for a given tile's posterior estimate.
-            bool[] z = Sense(currentTile);
-            //bool[] z = theBigOne[currentTile.GetCoords()];
+            //bool[] z = Sense(this.activeTile);  //Uncomment this for actual chance of error
+            bool[] z = theBigOne[this.activeTile.GetCoords()];    //uncomment this for guaranteed correct scan
             double[] guesstimate = new double[4];
 
-            Console.WriteLine(String.Format("The Tile I'm at: {0},{1}", currentTile.x, currentTile.y));
+            Console.WriteLine(String.Format("The Tile I'm at: {0},{1}", this.activeTile.x, this.activeTile.y));
             Console.WriteLine(String.Format("What I THINK I see...{0}", printEvidence(z)));
-            Console.WriteLine(String.Format("What's REALLY there... {0}", printEvidence(this.theBigOne[currentTile.GetCoords()])));
+            Console.WriteLine(String.Format("What's REALLY there... {0}", printEvidence(this.theBigOne[this.activeTile.GetCoords()])));
 
             double guess = 0.0;
             double runningSum = 0.0;
-            foreach (var x in theBigOne)            //FIXME: wait idk. lol.
+            foreach (var x in theBigOne)
             {
                 guess = 0.0;
                 for (int i = 0; i < 4; i++)
@@ -145,13 +150,14 @@ namespace P2
                 myGuess[(x.Key.Item1, x.Key.Item2)] = guess;    //ok i did that . now we have to sum that with all tiles ever yay and divide.
                 runningSum += guess;
             }
-            //what the fuck is it doing dawg.
-            //It's detecting them fine, but not mathing that up?
             foreach(var x in theBigOne)
             {
                 myGuess[(x.Key.Item1, x.Key.Item2)] /= runningSum;
             }
             updateMaze();
+            Console.WriteLine(String.Format("Updated Prediction after scan {0}", printEvidence(z)));
+            internalMaze.PrintMaze();
+            Console.WriteLine(Environment.NewLine);
         }
         
         private void updateMaze()
@@ -170,8 +176,7 @@ namespace P2
         //Prob. function *based on* algorithm by Tâm Carbon https://tamcarbonart.wordpress.com/2018/10/09/c-pick-random-elements-based-on-probability/
         private void GetMove(Tile tgtTile, int dir)
         {   /* 
-             * call from main . whatever .... !!!
-             * determine target direction
+             * randomly determine target direction
              * get 3 direction values based on this - one to 'right' and one to 'left' (+ original)  R,L,F
              * populate array of neighbors based on 3 directions, eg:
              * direction directions[] = new directions[3] {directions.west, directions.north, directions.east }
@@ -213,22 +218,103 @@ namespace P2
             //moveTo(neighborTiles[tgtIndex]);
         }
 
-        public void Predict(Tile prev, Tile current)
+        public void Move(char input)
+        {
+            char c = char.ToUpper(input);
+            int attemptedMvmt;
+            switch (c)
+            {
+                case 'W':
+                    attemptedMvmt = 0;
+                    break;
+                case 'N':
+                    attemptedMvmt = 1;
+                    break;
+                case 'E':
+                    attemptedMvmt = 2;
+                    break;
+                case 'S':
+                    attemptedMvmt = 3;
+                    break;
+                default:
+                    attemptedMvmt = 4;
+                    break;
+            }
+
+            Tile nextTile = GetNeighbor(this.activeTile, (direction)attemptedMvmt);
+            this.activeTile = nextTile;
+            Predict(attemptedMvmt, c);
+        }
+
+        public void Predict(int attemptedMvmt, char c)
         { /* This is it Luigi...
            * Prob at any given tile 'r' is equal to:
            * The SUM, for all tiles 's' which CAN move into 'r' (in context of action 'd')...
-           * Of the probability that I started out in 's' TIMES the probability that I moved into 'r' FROM 's'
+           * Of the probability that I started out in 's' (cumulative) TIMES the probability that I moved into 'r' FROM 's'
            * Got it?
            */
-            foreach(var x in theBigOne) //using list of objective truths as iterator because that makes sense.
+            direction dir = (direction)attemptedMvmt;
+            direction[] dirs = new direction[3];
+            Tile[] neighborTiles = new Tile[3];
+            double prob = 0.0;
+            double oldprob = 0.0;
+            /*manual: (REVERSE RLF ORDER)
+             * who moved into me?
+             * if d == west
+             * my south, north, or east neighbor
+             * 
+             * if d == north
+             * my west, east, or south neighbor
+
+             * if d == east
+             * my north, south, or west neighbor
+             * 
+             * if d == south
+             * my east, west, or north neighbor
+            */
+
+            switch (dir)       //MOST neighbor math can be determined by index +/- 1, but it is not the proper time to worry over niceties like this
+            {                   //INDEX ORDER: They CAME from that (RLF) dir
+                case direction.west:
+                    dirs = new direction[3] { direction.south, direction.north, direction.east };
+                    break;
+                case direction.north:
+                    dirs = new direction[3] { direction.west, direction.east, direction.south };
+                    break;
+                case direction.east:
+                    dirs = new direction[3] { direction.north, direction.south, direction.west };
+                    break;
+                case direction.south:
+                    dirs = new direction[3] { direction.east, direction.west, direction.north };
+                    break;
+                default:
+                    //bad habit I suppose but with any luck there will only be 4 directions to choose from.
+                    break;
+            }
+            //'d'. eliminates need to check 0-prob neighbors.
+            foreach (var x in theBigOne) //using list of TRUTHS!! as iterator because that makes sense.
             {                           //'r'
                 //d
                 //s
-                //
+                //determining s is the hard part. need to know: 
+                //attempted global direction, backtrack from this direction all moves to end up 'here'
+                //then choose neighbors which match these criteria. easy.
+                prob = 0.0;
+                oldprob = 0.0;
+                for (int i = 0; i < 3; i++)
+                { neighborTiles[i] = GetNeighbor(internalMaze.GetTile(x.Key), dirs[i]); }
+                for(int i = 0; i < 3; i++)
+                {
+                    oldprob = myGuess[neighborTiles[i].GetCoords()];
+                    prob += (DIR_PROB[i] * oldprob);
+                }
+                myGuess[x.Key] = prob;
 
             }
-
-
+            updateMaze();
+            Console.WriteLine(String.Format("Updated Prediction after action {0}", c));
+            internalMaze.PrintMaze();
+            Console.WriteLine(Environment.NewLine);
         }
 
         private Tile GetNeighbor(Tile current, direction x) //sets neighbor in context of possible movement ONLY!!!!
