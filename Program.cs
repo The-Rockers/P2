@@ -24,7 +24,7 @@ namespace P2
             };
             Maze myMaze = new Maze(7, 7);
             myMaze.MakePath(pathList);
-            Tile demo = myMaze.GetTile((1, 1));
+            Tile demo = myMaze.GetTile((3,4));      //START TILE BASED ON PROJECT PDF IS 3,4 !!!!
 
             myMaze.PrintMaze();
 
@@ -39,7 +39,7 @@ namespace P2
 
             myMaze.PrintMaze();
             Console.WriteLine(Environment.NewLine);
-
+            /*
             byte userX, userY;
             Console.WriteLine("Enter coordinates to test");
             userX = Convert.ToByte(Console.ReadLine());
@@ -51,7 +51,8 @@ namespace P2
                 Console.WriteLine("Enter coordinates to test");
                 userX = Convert.ToByte(Console.ReadLine());
                 userY = Convert.ToByte(Console.ReadLine());
-            }
+                Console.Clear();
+            }*/
 
         }
         /*

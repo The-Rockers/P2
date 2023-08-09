@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.Metrics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -91,9 +92,7 @@ namespace P2
                 //so I can just assign to "actual" at end of iteration
                 measurement[i] = actual;
             }
-            Console.WriteLine(String.Format("The Tile I'm at: {0},{1}",tgtTile.x, tgtTile.y));
-            Console.WriteLine(String.Format("What I THINK I see...{0}", printEvidence(measurement)));
-            Console.WriteLine(String.Format("What's REALLY there... {0}", printEvidence(this.theBigOne[tgtTile.GetCoords()])));
+
             return measurement;
         }
 
@@ -114,14 +113,20 @@ namespace P2
         {                       //Filter: foreach item in list of open tiles, multiply together all (Z|S), then take that and multiply it by the previously existing estimate.
                                 //divide THAT number by the sum of ALL of those numbers for a given tile's posterior estimate.
             bool[] z = Sense(currentTile);
+            //bool[] z = theBigOne[currentTile.GetCoords()];
             double[] guesstimate = new double[4];
+
+            Console.WriteLine(String.Format("The Tile I'm at: {0},{1}", currentTile.x, currentTile.y));
+            Console.WriteLine(String.Format("What I THINK I see...{0}", printEvidence(z)));
+            Console.WriteLine(String.Format("What's REALLY there... {0}", printEvidence(this.theBigOne[currentTile.GetCoords()])));
+
             double guess = 0.0;
             double runningSum = 0.0;
             foreach (var x in theBigOne)            //FIXME: wait idk. lol.
             {
+                guess = 0.0;
                 for (int i = 0; i < 4; i++)
                 {
-
                     if (x.Value[i])     //wall
                     {
                         if (z[i]) { guesstimate[i] = HIT_GIVEN_EXIST; } //true given true
@@ -130,20 +135,21 @@ namespace P2
                     else                //no wall
                     {
                         if (z[i]) { guesstimate[i] = HIT_GIVEN_EMPTY; } //true given false
-                        else { guesstimate[i] = MIS_GIVEN_EXIST; } //false given false
+                        else { guesstimate[i] = MIS_GIVEN_EMPTY; } //false given false
                     }
                     //should probably. change this such that it checks most common cases (true|true, false|false) first.
                 }
-                for(int j = 1; j < 4; j++) { guesstimate[0] *= guesstimate[j]; }
-                guess = guesstimate[0];
+                
+                guess = guesstimate[0] * guesstimate[1] * guesstimate[2] * guesstimate[3];
                 guess *= myGuess[(x.Key.Item1, x.Key.Item2)];
                 myGuess[(x.Key.Item1, x.Key.Item2)] = guess;    //ok i did that . now we have to sum that with all tiles ever yay and divide.
                 runningSum += guess;
-                //now remember to change the tile's face to this value. also round it to 4(?) digits
             }
-            foreach(var y in theBigOne)
+            //what the fuck is it doing dawg.
+            //It's detecting them fine, but not mathing that up?
+            foreach(var x in theBigOne)
             {
-                myGuess[(y.Key.Item1, y.Key.Item2)] /= runningSum;
+                myGuess[(x.Key.Item1, x.Key.Item2)] /= runningSum;
             }
             updateMaze();
         }
@@ -161,20 +167,22 @@ namespace P2
         }
 
 
-        //Prob. function based on algorithm by Tâm Carbon https://tamcarbonart.wordpress.com/2018/10/09/c-pick-random-elements-based-on-probability/
-        private void GetMove(Tile tgtTile)
-        {
-            //determine target direction (somehow)
-            //get 3 direction values based on this - one to 'right' and one to 'left' (+ original)  R,L,F
-            //populate array of neighbors based on 3 directions, eg:
-            //  direction directions[] = new directions[3] {directions.west, directions.north, directions.east }
-            //  for(int i = 0; i < 3; i++) { neigborTiles[i] = GetNeighbor(curentTile, directions[i]) }
+        //Prob. function *based on* algorithm by Tâm Carbon https://tamcarbonart.wordpress.com/2018/10/09/c-pick-random-elements-based-on-probability/
+        private void GetMove(Tile tgtTile, int dir)
+        {   /* 
+             * call from main . whatever .... !!!
+             * determine target direction
+             * get 3 direction values based on this - one to 'right' and one to 'left' (+ original)  R,L,F
+             * populate array of neighbors based on 3 directions, eg:
+             * direction directions[] = new directions[3] {directions.west, directions.north, directions.east }
+             * for(int i = 0; i < 3; i++) { neigborTiles[i] = GetNeighbor(curentTile, directions[i]) }
+            */
             Random q = new Random();
-            direction toss = (direction)(q.Next(0, 3)); //picking random direction to move for now??? (TikTok TTS lady voice)
+            direction toss = (direction)dir; //(q.Next(0, 3)); //picking random direction to (try to) move for now??? (TikTok TTS lady voice) never mind
             double roll = q.NextDouble();
             double cumulativeProb = 0.0;
             int tgtIndex = 0;
-            direction[] directions;
+            direction[] directions; //0=RIGHT 1=LEFT 2=FWD
             Tile[] neighborTiles = new Tile[3];
 
             switch (toss)       //MOST neighbor math can be determined by index +/- 1, but not west and south (ends of the list/no wraparound)
@@ -205,6 +213,24 @@ namespace P2
             //moveTo(neighborTiles[tgtIndex]);
         }
 
+        public void Predict(Tile prev, Tile current)
+        { /* This is it Luigi...
+           * Prob at any given tile 'r' is equal to:
+           * The SUM, for all tiles 's' which CAN move into 'r' (in context of action 'd')...
+           * Of the probability that I started out in 's' TIMES the probability that I moved into 'r' FROM 's'
+           * Got it?
+           */
+            foreach(var x in theBigOne) //using list of objective truths as iterator because that makes sense.
+            {                           //'r'
+                //d
+                //s
+                //
+
+            }
+
+
+        }
+
         private Tile GetNeighbor(Tile current, direction x) //sets neighbor in context of possible movement ONLY!!!!
         {
             Tile testTgt;
@@ -212,25 +238,25 @@ namespace P2
             switch (x)
             {
                 case direction.west:
-                    testTgt = new Tile((byte)(current.x - 1), (byte)(current.y));
+                    testTgt = internalMaze.GetTile(((byte)(current.x - 1), (byte)(current.y)));
                     if(internalMaze.IsLegalMove(current, testTgt)) { return testTgt; }
                     break;
                 case direction.north:
-                    testTgt = new Tile((byte)(current.x), (byte)(current.y - 1));
+                    testTgt = internalMaze.GetTile(((byte)(current.x), (byte)(current.y - 1)));
                     if (internalMaze.IsLegalMove(current, testTgt)) { return testTgt; }
                     break;
                 case direction.east:
-                    testTgt = new Tile((byte)(current.x + 1), (byte)(current.y));
+                    testTgt = internalMaze.GetTile(((byte)(current.x + 1), (byte)(current.y)));
                     if (internalMaze.IsLegalMove(current, testTgt)) { return testTgt; }
                     break;
                 case direction.south:
-                    testTgt = new Tile((byte)(current.x), (byte)(current.y + 1));
+                    testTgt = internalMaze.GetTile(((byte)(current.x), (byte)(current.y + 1)));
                     if (internalMaze.IsLegalMove(current, testTgt)) { return testTgt; }
                     break;
                 default:
                     break;
             }
-            return current; //return self if no neighbor in given direction- automatic bounce! (move into wall -> not legal -> ends up on self)
+            return current; //return self if no neighbor in given direction- automatic bounce! (target wall -> not legal -> ends up on self)
         }
 
 

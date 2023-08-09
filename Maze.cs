@@ -113,8 +113,8 @@ namespace P2
                     try 
                     { 
                         tileSet.TryGetValue((j, i), out Tile ex);
-                        Console.Write(" ");
-                        Console.Write(ex.face);
+                        //Console.Write(" ");
+                        Console.Write(String.Format("{0,-6}",ex.face));
                     }
                     catch(NullReferenceException)
                     {
