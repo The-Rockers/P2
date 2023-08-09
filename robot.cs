@@ -16,7 +16,7 @@ namespace P2
         const double FWD = 0.75;
         const double LFT = 0.15;
         const double RGT = 0.10;
-        readonly double[] DIR_PROB = new double[3] { RGT, LFT, FWD }; //R,L,F
+        readonly double[] DIR_PROB = new double[] { RGT, LFT, FWD, 0.0 }; //R,L,F
         enum direction { west, north, east, south }; //0 = west 1 = north 2 = east 3 = south
         Maze internalMaze;
         bool[] measurements = new bool[4];
@@ -247,16 +247,11 @@ namespace P2
         }
 
         public void Predict(int attemptedMvmt, char c)
-        { /* This is it Luigi...
-           * Prob at any given tile 'r' is equal to:
-           * The SUM, for all tiles 's' which CAN move into 'r' (in context of action 'd')...
-           * Of the probability that I started out in 's' (cumulative) TIMES the probability that I moved into 'r' FROM 's'
-           *     aka Prob(I started in neighbor 's' considering the evidence) * Prob('s' got me to 'r')
-           * Got it?
-           */
+        {
             direction dir = (direction)attemptedMvmt;
             direction[] dirs = new direction[3];
-            Tile[] neighborTiles = new Tile[3];
+            direction[] transDir = new direction[3];
+            Tile[] neighborTiles = new Tile[4];
             double prob;
             double oldprob;
             /*manual: (REVERSE RLF ORDER)
@@ -274,80 +269,56 @@ namespace P2
              * my east, west, or north neighbor
             */
             Tile q;
+            Tile r;
+
 
             switch (dir)       //MOST neighbor math can be determined by index +/- 1, but it is not the proper time to worry over niceties like this
-            {                   //INDEX ORDER: They CAME from that (RLF) dir
+            {                  //LR B -- they MOVE in RLF
                 case direction.west:
-                    dirs = new direction[3] { direction.south, direction.north, direction.east };
+                    dirs = new direction[4] { direction.south, direction.north, direction.east, direction.west };
+                    transDir = new direction[4] { direction.north, direction.south, direction.west, direction.east };
                     break;
                 case direction.north:
-                    dirs = new direction[3] { direction.west, direction.east, direction.south };
+                    dirs = new direction[4] { direction.west, direction.east, direction.south, direction.north };
+                    transDir = new direction[4] { direction.east, direction.west, direction.north, direction.south };
                     break;
                 case direction.east:
-                    dirs = new direction[3] { direction.north, direction.south, direction.west };
+                    dirs = new direction[4] { direction.north, direction.south, direction.west, direction.east };
+                    transDir = new direction[4] { direction.south, direction.north, direction.east, direction.west };
                     break;
                 case direction.south:
-                    dirs = new direction[3] { direction.east, direction.west, direction.north };
+                    dirs = new direction[4] { direction.east, direction.west, direction.north, direction.south };
+                    transDir = new direction[4] { direction.west, direction.east, direction.south, direction.north };
                     break;
                 default:
                     //bad habit I suppose but with any luck there will only be 4 directions to choose from.
                     break;
             }
-            //'d'. eliminates need to check 0-prob neighbor DIRECTIONS (eg North neighbor after North movement).
+            //'d'
             foreach (var x in theBigOne) //using list of TRUTHS!! as iterator because that makes sense.
             {                           //'r'
                 //need 2 know attempted global direction, backtrack from this direction all moves to end up 'here'
-                //then choose neighbors which match these criteria. easy.
                 q = internalMaze.GetTile(x.Key);
                 prob = 0.0;
                 oldprob = 0.0;
-                for (int i = 0; i < 3; i++)
-                { neighborTiles[i] = GetNeighbor(q, dirs[i]); }
+                for (int i = 0; i < 4; i++)
+                { neighborTiles[i] = GetNeighbor(q, dirs[i]); } //neighbors in order of who travelled RLF to get here. INCLUDES SELF
 
-                int tmpDir = -1;
-                //3 tiles can enter, self can reach self. 4 total options for entry.
-
-                /*
-                 * foreach valid neighbor (4 spaces)
-                 * check all 3 possible directions if getNeighbor ends up on target space
-                 * if so do the thing ok go
-                */
-                /*
-                foreach(Tile g in neighborTiles)
+                for(int i = 0; i < 4; i++)
                 {
-                    oldprob = myGuess[g.GetCoords()];
-                    for(int i = 0; i < 3; i++)
+                    if (GetNeighbor(neighborTiles[i], transDir[i]) == q)    //neighbor in direction dirs[i] can move in transDir[i] to reach q
                     {
-                        if(GetNeighbor(g, dirs[i]) == q)    //cycles R L F
-                        {
-                            tmpDir = i;
-                            break;
-                        }
+                        prob += (myGuess[neighborTiles[i].GetCoords()] * DIR_PROB[i]);
                     }
-                    prob += (oldprob * DIR_PROB[tmpDir]);
-
-                }
-                */
-                for (int i = 0; i < 3; i++)
-                {
-                    if (GetNeighbor(q, dirs[i]) == q)
+                    else if (GetNeighbor(neighborTiles[i], dirs[i]) == q)   //if it can move the same direction to reach, it IS that. Q's left neighbor can only move left to reach Q if the neighbor IS Q
                     {
-                        prob += (DIR_PROB[i] * myGuess[q.GetCoords()]);
+                        if(i == 0) { prob += (myGuess[neighborTiles[i].GetCoords()] * DIR_PROB[1]); } //reverse! trigger the opposite DIR_PROB
+                        else if (i == 1) { prob += (myGuess[neighborTiles[i].GetCoords()] * DIR_PROB[0]); }
+                        else if (i == 2) { prob += (myGuess[neighborTiles[i].GetCoords()] * DIR_PROB[3]); }
                     }
                 }
-                if(GetNeighbor(q, dir) == q)
-                {
-                    prob += (DIR_PROB[2] * myGuess[q.GetCoords()]);
-                }
-                for (int i = 0; i < 3; i++)
-                {
-                    oldprob = myGuess[neighborTiles[i].GetCoords()];
-                    if (internalMaze.IsLegalMove(neighborTiles[i], q))
-                    {
-                        prob += (DIR_PROB[i] * oldprob);
-                    }
-                }   //determined the issue: assuming that there must exist a neighbor which can satisfy each movement possibility.
-                    //doesnt *explicitly* account for self, either.
+
+                
 
                 myGuess[x.Key] = prob;
 
@@ -386,11 +357,7 @@ namespace P2
             return current; //return self if no neighbor in given direction- automatic bounce! (target wall -> not legal -> ends up on self)
         }
 
-        private direction GetDirection(Tile x, Tile y) //returns direction from Y to X. eg Y travels WEST to reach X
-        {
 
-            return (direction)1;
-        }
 
 
 
